@@ -1,5 +1,5 @@
-# Python
-__pycache__/
+Python
+pycache/
 *.py[cod]
 *$py.class
 *.so
@@ -20,18 +20,19 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual Environment
+Virtual Environment
 venv/
 env/
 ENV/
 .venv
 
-# Environment variables
+Environment variables
 .env
 .env.local
 .env.*.local
+.env.example
 
-# IDE
+IDE
 .vscode/
 .idea/
 *.swp
@@ -39,33 +40,31 @@ ENV/
 *~
 .DS_Store
 
-# Testing
+Testing
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
 
-# Logs
+Logs
 *.log
 logs/
 
-# Database
+Database
 *.db
 *.sqlite
 
-# Uploads
-uploads/*.pdf
-!uploads/SAMPLE_*.pdf
+Uploads
+uploads/.pdf
+!uploads/SAMPLE_.pdf
 
-# Secrets/Keys
+Secrets/Keys
 *.pem
 *.key
 credentials.json
 
-# OS
+OS
 Thumbs.db
 
-
 run.sh
-
 run.bat
