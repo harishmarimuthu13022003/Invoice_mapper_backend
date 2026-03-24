@@ -48,6 +48,8 @@ class LineItem(BaseModel):
     suggested_code: Optional[str] = None
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     reasoning: Optional[str] = None
+    detected_category: Optional[str] = None
+    category: Optional[str] = None
     final_code: Optional[str] = None
     flagged: bool = False
     retrieved_codes: Optional[List[dict]] = None
