@@ -1,0 +1,48 @@
+[
+  {
+    "code": "PC001",
+    "description": "Assistance with personal hygiene including bathing and dressing",
+    "category": "Personal Care"
+  },
+  {
+    "code": "PC002",
+    "description": "Help with meal preparation and feeding",
+    "category": "Personal Care"
+  },
+  {
+    "code": "NU001",
+    "description": "Nursing care for wound dressing",
+    "category": "Nursing"
+  },
+  {
+    "code": "NU002",
+    "description": "Medication administration",
+    "category": "Nursing"
+  },
+  {
+    "code": "DA001",
+    "description": "House cleaning and laundry services",
+    "category": "Domestic Assistance"
+  },
+  {
+    "code": "DA002",
+    "description": "Gardening and yard maintenance",
+    "category": "Gardening"
+  },
+  {
+    "code": "ME001",
+    "description": "Meal delivery and preparation",
+    "category": "Meals"
+  },
+  {
+    "code": "TR001",
+    "description": "Transport to medical appointments",
+    "category": "Transport"
+  },
+  {
+    "code": "AH001",
+    "description": "Physiotherapy sessions",
+    "category": "Allied Health"
+  }
+  // Add more up to 50
+]

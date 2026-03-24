@@ -1,0 +1,24 @@
+# FastAPI and Server
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+
+# MongoDB
+motor==3.3.2
+pymongo==4.6.1
+
+# Pinecone (Vector Store)
+pinecone-client==3.0.0
+
+# LLM APIs - Direct HTTP calls (no langchain!)
+requests==2.31.0
+
+# TF-IDF Embeddings (no PyTorch!)
+scikit-learn==1.4.0
+
+# PDF Processing
+pypdf==3.17.4
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+python-multipart==0.0.6

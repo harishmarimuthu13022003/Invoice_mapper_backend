@@ -1,0 +1,40 @@
+{
+  "users": {
+    "_id": "ObjectId",
+    "username": "string",
+    "password": "string",
+    "role": "Administrator|Supplier|Finance|Technical Monitor",
+    "email": "string"
+  },
+  "invoices": {
+    "_id": "ObjectId",
+    "supplier_id": "string",
+    "pdf_path": "string",
+    "status": "Pending|Approved",
+    "uploaded_at": "ISODate",
+    "line_items": [
+      {
+        "description": "string",
+        "suggested_code": "string",
+        "confidence_score": 0.95,
+        "reasoning": "string",
+        "final_code": "string",
+        "flagged": false
+      }
+    ]
+  },
+  "audit_logs": {
+    "_id": "ObjectId",
+    "invoice_id": "string",
+    "action": "string",
+    "user_id": "string",
+    "timestamp": "ISODate",
+    "details": "string"
+  },
+  "service_codes": {
+    "_id": "ObjectId",
+    "code": "string",
+    "description": "string",
+    "category": "Personal Care|Nursing|..."
+  }
+}
