@@ -1646,29 +1646,6 @@ if __name__ == "__main__":
     print("\n📊 Stats:", engine.get_stats())
 
 
-# ================= CLEANING LOGIC =================
-
-# Clean up the description - remove dollar amounts
-clean_desc = re.sub(r'\$\s*[\d,]+\.?\d*', '', clean_desc)
-
-# Remove repeated amounts (like $95.00 $95.00)
-clean_desc = re.sub(r'([\d,]+\.?\d*)\s+\1', r'\1', clean_desc)
-
-# Remove multiple spaces
-clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
-
-# Remove leading/trailing special characters
-clean_desc = clean_desc.strip('\-\–\—\:\.\,\*\#\@\s')
-
-# Only keep if we have meaningful content left
-if len(clean_desc) > 3:
-    items.append({"description": clean_desc, "amount": amount})
-else:
-    items.append({"description": line, "amount": amount})
-
-# return items
-
-
 def parse_line_items_simple(self, text: str) -> List[str]:
     """Parse invoice text into line items (legacy method)"""
     lines = text.split('\n')
@@ -2569,26 +2546,6 @@ JSON:"""
 if __name__ == "__main__":
     engine = RAGEngine()
     print("\n📊 Stats:", engine.get_stats())
-
-
-# ================= CLEANING LOGIC =================
-
-# Remove repeated amounts (like $95.00 $95.00)
-clean_desc = re.sub(r'([\d,]+\.?\d*)\s+\1', r'\1', clean_desc)
-
-# Remove multiple spaces
-clean_desc = re.sub(r'\s+', ' ', clean_desc).strip()
-
-# Remove leading/trailing special characters
-clean_desc = clean_desc.strip('\-\–\—\:\.\,\*\#\@\s')
-
-# Only keep if we have meaningful content left
-if len(clean_desc) > 3:
-    items.append({"description": clean_desc, "amount": amount})
-else:
-    items.append({"description": line, "amount": amount})
-
-
 
 
 def detect_category_from_description(self, description: str) -> str:
