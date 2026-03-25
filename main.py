@@ -49,7 +49,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://invoice-checker-frontend.vercel.app",  # Production Vercel App
+        "https://invoice-checker-frontend.vercel.app",  # Production for front end Vercel App
         "https://e-com-1-699ca.web.app",  # Flutter web app
         "http://localhost",  # Local development
         "http://localhost:5173",  # Local Vite development
