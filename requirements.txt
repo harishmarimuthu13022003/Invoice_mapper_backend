@@ -7,7 +7,7 @@ motor
 pymongo
 
 # Pinecone (Vector Store)
-pinecone-client
+pinecone
 
 # LLM APIs - Direct HTTP calls (no langchain!)
 requests
