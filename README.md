@@ -42,13 +42,30 @@ When a Supplier uploads an invoice (`/invoices/upload`), the backend immediately
 
 ## 🏃 Running the Backend Locally
 
-1. Ensure **Python 3.10+** is installed.
-2. Clone, setup an environment, and install `requirements.txt`.
-3. Create your `.env` defining:
-    * `MONGODB_URI`, `PINECONE_API_KEY`
-    * `GROQ_API_KEY`, `GEMINI_API_KEY`
-4. Start the server (runs via Uvicorn):
+1. Ensure **Python 3.10+** is installed on your machine.
+2. Clone the repository and navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+3. Create a virtual environment (optional but recommended):
+   ```bash
+   python -m venv venv
+   # On Windows:
+   venv\Scripts\activate
+   # On macOS/Linux:
+   source venv/bin/activate
+   ```
+4. **Install all dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+5. Create your `.env` explicitly defining your API keys:
+    * `MONGODB_URI`
+    * `PINECONE_API_KEY`
+    * `GROQ_API_KEY`
+    * `GEMINI_API_KEY`
+6. **Start the FastApi server:**
    ```bash
    python main.py
    ```
-   *Available on `http://localhost:8003`*
+   *The server will boot up and be accessible on `http://localhost:8003`*
