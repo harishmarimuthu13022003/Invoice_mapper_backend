@@ -45,6 +45,7 @@ class ServiceCodeCreate(BaseModel):
 class LineItem(BaseModel):
     """Line item extracted from invoice"""
     description: str
+    amount: float = 0.0
     suggested_code: Optional[str] = None
     confidence_score: Optional[float] = Field(None, ge=0.0, le=1.0)
     reasoning: Optional[str] = None

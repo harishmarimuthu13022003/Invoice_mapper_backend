@@ -94,6 +94,17 @@ async def startup_event():
     try:
         rag = RAGEngine()
         print(f"[OK] RAG Engine initialized")
+        
+        # Load dynamic categories from DB
+        import rag_engine
+        if db is not None:
+            cursor = db.service_codes.find({})
+            async for doc in cursor:
+                cat = doc.get("category")
+                code = doc.get("code")
+                if cat and code and cat not in rag_engine.CATEGORY_SERVICE_CODES:
+                    rag_engine.CATEGORY_SERVICE_CODES[cat] = code
+                    
     except Exception as e:
         print(f"[WARN] RAG Engine initialization issue: {e}")
         rag = None
@@ -195,9 +206,6 @@ async def upload_invoice(
 ):
     """
     Upload and process an invoice
-    1. Save PDF to uploads folder
-    2. Process with RAG engine
-    3. Store in MongoDB
     """
     # Validate file type
     if not file.filename.lower().endswith('.pdf'):
@@ -211,108 +219,115 @@ async def upload_invoice(
     with open(file_path, "wb") as f:
         f.write(await file.read())
     
-    # Process with RAG
-    gender = "Unknown"  # Default gender
-    category_requests_created = []  # Track category requests
-    if rag:
-        rag_result = rag.process_invoice(file_path)
-        if isinstance(rag_result, dict):
-            results = rag_result.get("line_items", [])
-            gender = rag_result.get("gender", "Unknown")
+    # Process with RAG - Wrapped in try/except to prevent 500 error
+    try:
+        gender = "Unknown"
+        results = []
+        rag_result = {"line_items": [], "gender": "Unknown", "total_amount": 0.0}
+        
+        if rag:
+            rag_result = rag.process_invoice(file_path)
+            if isinstance(rag_result, dict):
+                results = rag_result.get("line_items", [])
+                gender = rag_result.get("gender", "Unknown")
+            else:
+                results = rag_result
         else:
-            results = rag_result
-    else:
-        results = [{"error": "RAG engine not available"}]
-    
-    # Create line items
-    line_items = []
-    has_pending_approval = False  # Track if any item needs approval
-    for item in results:
-        if "error" not in item:
-            # Check if this item needs approval for new category
-            needs_approval = item.get("needs_approval", False)
-            if needs_approval:
-                has_pending_approval = True
-                # Create a category request
-                category_request = {
-                    "description": item.get("description", ""),
-                    "suggested_category": item.get("suggested_category", "New Category"),
-                    "suggested_code": item.get("suggested_code_format", "01_999_9999_1_1"),
-                    "requested_by": user.username,
-                    "invoice_id": f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}",
-                    "status": "Pending",
-                    "requested_at": datetime.now()
-                }
-                # Insert category request
-                cat_result = await db.category_requests.insert_one(category_request)
-                category_request["_id"] = str(cat_result.inserted_id)
-                category_requests_created.append(category_request)
+            results = [{"error": "RAG engine not available"}]
+        
+        # Create line items
+        line_items = []
+        has_pending_approval = False
+        
+        # Create invoice document basic details
+        invoice_id = f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+        for item in results:
+            if "error" not in item:
+                # Use 'flagged' from RAG result
+                item_flagged = item.get("flagged", False)
+                if item_flagged:
+                    has_pending_approval = True
+                    
+                needs_approval = item.get("needs_approval", False)
+                if needs_approval and db is not None:
+                    # Create a category request for admin
+                    await db.category_requests.insert_one({
+                        "description": item.get("description", ""),
+                        "suggested_category": item.get("suggested_category_new", "Unknown"),
+                        "suggested_code": item.get("suggested_code_format", "01_999_9999_1_1"),
+                        "requested_by": user.username,
+                        "invoice_id": invoice_id,
+                        "status": "Pending",
+                        "requested_at": datetime.now()
+                    })
+                
+                line_items.append(LineItem(
+                    description=item.get("description", ""),
+                    amount=item.get("amount", 0.0),
+                    suggested_code=item.get("suggested_code", ""),
+                    confidence_score=item.get("confidence_score", 0.0),
+                    reasoning=item.get("reasoning", ""),
+                    category=item.get("category", "General"),
+                    detected_category=item.get("category", "General"),
+                    final_code=item.get("suggested_code") if not needs_approval else "PENDING_APPROVAL",
+                    flagged=item_flagged,
+                    retrieved_codes=item.get("retrieved_codes", [])
+                ))
+        
+        # Determine invoice status
+        invoice_status = "Pending Admin Approval" if has_pending_approval else "Pending Finance Approval"
+
+        invoice_data = {
+            "invoice_id": invoice_id,
+            "supplier_id": user.username,
+            "pdf_path": file_path,
+            "status": invoice_status,
+            "uploaded_at": datetime.now(),
+            "line_items": [item.dict() for item in line_items],
+            "total_amount": rag_result.get("total_amount", 0.0) if isinstance(rag_result, dict) else 0.0,
+            "processed_by": "RAG Engine",
+            "gender": gender,
+            "supplier_confirmed": False,
+            "finance_approved": False
+        }
+        
+        # Save to MongoDB
+        if db is not None:
+            result = await db.invoices.insert_one(invoice_data)
+            invoice_data["_id"] = str(result.inserted_id)
             
-            line_items.append(LineItem(
-                description=item.get("description", ""),
-                suggested_code=item.get("suggested_code", ""),
-                confidence_score=item.get("confidence_score", 0.0),
-                reasoning=item.get("reasoning", ""),
-                final_code=item.get("suggested_code") if not needs_approval else "PENDING_APPROVAL",  # Keep pending if needs approval
-                flagged=needs_approval or item.get("flagged", False),
-                retrieved_codes=item.get("retrieved_codes", [])
-            ))
-    
-    # Determine invoice status
-    # Flow: Upload -> RAG Process -> Finance Officer Approval -> Approved
-    # For new category: Upload -> RAG -> Admin Approval -> Finance Approval -> Approved
-    if has_pending_approval:
-        # New category needs admin approval first
-        invoice_status = "Pending Admin Approval"  # Waiting for admin to approve new category
-    else:
-        # Existing category - goes directly to Finance Officer for approval (no supplier confirmation needed)
-        invoice_status = "Pending Finance Approval"
-    
-    # Create invoice document
-    invoice_id = f"INV-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    invoice_data = {
-        "invoice_id": invoice_id,
-        "supplier_id": user.username,
-        "pdf_path": file_path,
-        "status": invoice_status,
-        "uploaded_at": datetime.now(),
-        "line_items": [item.dict() for item in line_items],
-        "total_amount": rag_result.get("total_amount", 0.0),
-        "processed_by": "RAG Engine",
-        "gender": gender,  # Store gender detected from invoice
-        "category_requests": [cr["_id"] for cr in category_requests_created] if category_requests_created else [],
-        "supplier_confirmed": False,
-        "finance_approved": False
-    }
-    
-    # Save to MongoDB
-    result = await db.invoices.insert_one(invoice_data)
-    invoice_data["_id"] = str(result.inserted_id)
-    
-    # Log audit
-    await db.audit_logs.insert_one({
-        "invoice_id": invoice_data["invoice_id"],
-        "action": "INVOICE_UPLOADED",
-        "user_id": user.username,
-        "timestamp": datetime.now(),
-        "details": f"Uploaded {file.filename}, {len(line_items)} line items processed"
-    })
-    
-    return {
-        "invoice_id": invoice_data["invoice_id"],
-        "status": invoice_data["status"],
-        "line_items_count": len(line_items),
-        "flagged_count": sum(1 for item in line_items if item.flagged),
-        "gender": gender,
-        "category_requests_count": len(category_requests_created),
-        "category_requests": category_requests_created
-    }
+            # Log audit
+            await db.audit_logs.insert_one({
+                "invoice_id": invoice_data["invoice_id"],
+                "action": "INVOICE_UPLOADED",
+                "user_id": user.username,
+                "timestamp": datetime.now(),
+                "details": f"Uploaded {file.filename}, {len(line_items)} line items processed"
+            })
+        
+        return {
+            "invoice_id": invoice_id,
+            "status": invoice_status,
+            "line_items_count": len(line_items),
+            "flagged_count": sum(1 for item in line_items if item.flagged),
+            "gender": gender,
+            "total_amount": invoice_data["total_amount"]
+        }
+    except Exception as e:
+        import traceback
+        print(f"[ERROR] Invoice upload failed: {e}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error processing invoice: {str(e)}"
+        )
 
 
 @app.get("/invoices", response_model=List[dict])
 async def get_invoices(
     gender: Optional[str] = Query(None, description="Filter by gender: Male, Female, or Unknown"),
-    user: User = Depends(require_role(["Supplier", "Finance", "Administrator"]))
+    user: User = Depends(require_role(["Supplier", "Finance Officer", "Administrator"]))
 ):
     """
     Get all invoices based on user role
@@ -342,7 +357,7 @@ async def get_invoices(
 @app.get("/invoices/{invoice_id}", response_model=dict)
 async def get_invoice(
     invoice_id: str,
-    user: User = Depends(require_role(["Supplier", "Finance", "Administrator", "Technical Monitor"]))
+    user: User = Depends(require_role(["Supplier", "Finance Officer", "Administrator", "Technical Monitor"]))
 ):
     """Get a specific invoice by ID"""
     doc = await db.invoices.find_one({"invoice_id": invoice_id})
@@ -362,7 +377,7 @@ async def update_line_item(
     invoice_id: str,
     item_index: int,
     update: LineItemUpdate,
-    user: User = Depends(require_role(["Finance", "Administrator"]))
+    user: User = Depends(require_role(["Finance Officer", "Administrator"]))
 ):
     """
     Update a line item's final code
@@ -427,7 +442,7 @@ async def update_line_item(
 @app.post("/invoices/{invoice_id}/approve")
 async def approve_invoice(
     invoice_id: str,
-    user: User = Depends(require_role(["Finance", "Administrator"]))
+    user: User = Depends(require_role(["Finance Officer", "Administrator"]))
 ):
     """Approve an invoice"""
     invoice = await db.invoices.find_one({"invoice_id": invoice_id})
@@ -659,7 +674,7 @@ async def rag_suggest(
 @app.get("/category-requests", response_model=List[dict])
 async def get_category_requests(
     status: Optional[str] = Query(None, description="Filter by status: Pending, Approved, Rejected"),
-    user: User = Depends(require_role(["Finance", "Administrator"]))
+    user: User = Depends(require_role(["Finance Officer", "Administrator"]))
 ):
     """
     Get all category requests
@@ -683,7 +698,7 @@ async def get_category_requests(
 @app.get("/category-requests/{request_id}", response_model=dict)
 async def get_category_request(
     request_id: str,
-    user: User = Depends(require_role(["Finance", "Administrator"]))
+    user: User = Depends(require_role(["Finance Officer", "Administrator"]))
 ):
     """Get a specific category request by ID"""
     doc = await db.category_requests.find_one({"_id": request_id})
@@ -711,7 +726,13 @@ async def approve_category_request(
     - Then sends to supplier for confirmation
     """
     # Get the category request
-    cat_request = await db.category_requests.find_one({"_id": request_id})
+    from bson.objectid import ObjectId
+    try:
+        req_obj_id = ObjectId(request_id)
+    except:
+        req_obj_id = request_id
+        
+    cat_request = await db.category_requests.find_one({"_id": req_obj_id})
     if not cat_request:
         raise HTTPException(status_code=404, detail="Category request not found")
     
@@ -732,6 +753,10 @@ async def approve_category_request(
     
     # Store in vector knowledge base (RAG)
     if rag:
+        import rag_engine
+        # Update in-memory mapping to immediately respect the new category mapping
+        rag_engine.CATEGORY_SERVICE_CODES[new_service_code["category"]] = new_service_code["code"]
+        
         from rag_engine import ServiceCode
         rag.seed_service_codes([ServiceCode(
             code=new_service_code["code"],
@@ -741,7 +766,7 @@ async def approve_category_request(
     
     # Update category request status
     await db.category_requests.update_one(
-        {"_id": request_id},
+        {"_id": req_obj_id},
         {"$set": {
             "status": "Approved",
             "resolved_at": datetime.now(),
@@ -784,6 +809,9 @@ async def approve_category_request(
         "new_value": cat_request["suggested_code"]
     })
     
+    if "_id" in new_service_code:
+        new_service_code["_id"] = str(new_service_code["_id"])
+        
     return {
         "message": "Category request approved",
         "new_service_code": new_service_code
@@ -794,7 +822,7 @@ async def approve_category_request(
 async def reject_category_request(
     request_id: str,
     notes: Optional[str] = Body(None),
-    user: User = Depends(require_role(["Finance", "Administrator"]))
+    user: User = Depends(require_role(["Finance Officer", "Administrator"]))
 ):
     """
     Reject a category request

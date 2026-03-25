@@ -53,8 +53,8 @@ echo.
 echo 📌 Next steps:
 echo    1. Ensure MongoDB is running
 echo    2. Ensure Ollama is running (or use OpenAI)
-echo    3. API will be at: http://localhost:8001
-echo    4. API docs at: http://localhost:8001/docs
+echo    3. API will be at: http://localhost:8003
+echo    4. API docs at: http://localhost:8003/docs
 echo.
 
 REM Run the API
