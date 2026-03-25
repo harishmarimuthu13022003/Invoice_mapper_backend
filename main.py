@@ -48,10 +48,10 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify Flutter app URL
+    allow_origins=["*"],  # Allow all origins for Flutter web app
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*", "Content-Type", "Authorization", "x-role"],
 )
 
 # MongoDB Connection
